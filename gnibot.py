@@ -8,9 +8,14 @@ First, a few handler functions are defined. Then, those functions are passed to
 the Dispatcher and registered at their respective places.
 Then, the bot is started and runs until we press Ctrl-C on the command line.
 Usage:
-Basic Echobot example, repeats messages.
+Basic notification Bot, it looks for available appointments to GNIB office and posts updates into specific channel.
 Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
+
+TODO:
+
+- add check whether or not http request was successful
+- save state into file between launches
 """
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
@@ -40,28 +45,28 @@ prev_state = State()
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
-    update.message.reply_text('Hi!')
+    update.message.reply_text('Hi. I serve only one purpose at the moment. I post updates to INIS Appointments channel. I can\'t do anything else.')
 
 
 def help(bot, update):
-    update.message.reply_text('Help!')
+    update.message.reply_text('This bot serves a single purpose: it posts updates to INIS Appointments channel. That\'s it.')
 
 
-def echo(bot, update):
-    update.message.reply_text(update.message.text)
+def shrug(bot, update):
+    update.message.reply_text('¯\_(ツ)_/¯')
 
 
 def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
 
-
 def parse_dates(resp_dict):
     lst = []
     for entry in resp_dict['slots']:
         lst.append(entry['time'])
-    print('List of dates returned in http response: {list}'.format(list=lst))
+    logger.info('List of dates returned in http response: {list}'.format(list=lst))
     return lst
+
 
 def callback_query(bot, job):
 
@@ -72,18 +77,21 @@ def callback_query(bot, job):
     # if no dates available - change prev_state to empty list and exit
     if 'empty' in resp_dict.keys():
         prev_state.avail_dates = []
+        logger.info('No dates available')
 
     # if dates are available - get them as python list and compare to previous answer, exit if no changes
     else:
         state = parse_dates(resp_dict)
         if state == prev_state.avail_dates: # the response didn't change since last query, do nothing
-            print('No changes since last time')
+            logger.info('No changes since last time')
             pass
         else:
             new_list = (list(set(state).difference(prev_state.avail_dates))) # get dates that were not in the previous update
-            print('New entries in this response: {new}'.format(new=new_list))
+            logger.info('New entries in this response: {new}'.format(new=new_list))
             bot.send_message(chat_id=chat_id, text='New appointment dates available:\n' + '\n'.join(new_list))
             prev_state.avail_dates = state
+
+
 def main():
     # Create the EventHandler and pass it your bot's token.
     updater = Updater(api_token.token)
@@ -99,7 +107,7 @@ def main():
     dp.add_handler(CommandHandler("help", help))
 
     # on noncommand i.e message - echo the message on Telegram
-    dp.add_handler(MessageHandler(Filters.text, echo))
+    dp.add_handler(MessageHandler(Filters.text, shrug))
 
     # log all errors
     dp.add_error_handler(error)
@@ -119,15 +127,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-# proxies = {
-#     'http': 'http://127.0.0.1:8080',
-#     'https': 'http://127.0.0.1:8080',
-# }
-#
-# response = requests.get('https://burghquayregistrationoffice.inis.gov.ie/Website/AMSREG/AMSRegWeb.nsf/(getAppsNear)?openpage&cat=Work&sbcat=All&typ=New', proxies=proxies, verify=False)
-#
-## if no dates available, returns {"empty":"TRUE"}
-#
-# print(format(response.json()))
