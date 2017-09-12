@@ -123,7 +123,7 @@ def callback_query(bot, job):
         else:
             new_list = (list(set(state).difference(prev_state.avail_dates))) # get dates that were not in the previous update
             logger.info('New entries in this response: {new}'.format(new=new_list))
-            #bot.send_message(chat_id=botconf.chat_id, text='New appointment dates available:\n' + '\n'.join(new_list)) # post update to the channel
+            bot.send_message(chat_id=botconf.chat_id, text='New appointment dates available:\n' + '\n'.join(new_list)) # post update to the channel
             prev_state.avail_dates = state
             save_state(state)
 
