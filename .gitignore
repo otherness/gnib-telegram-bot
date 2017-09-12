@@ -105,4 +105,5 @@ venv.bak/
 Pipfile*
 
 # Project-specific
-api_token.py
+botconf.py
+state.csv

@@ -15,14 +15,15 @@ bot.
 TODO:
 
 - add check whether or not http request was successful
-- save state into file between launches
 """
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
 import logging
 import requests
-import api_token
 import urllib3
+import csv
+import os.path
+import botconf
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -31,9 +32,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Chat ID for INIS appointments channel
-chat_id = -1001148154214
 
 class State:
     """Class represents state of scheduling calendar"""
@@ -68,6 +66,38 @@ def parse_dates(resp_dict):
     return lst
 
 
+def touch(path):
+    with open(path, 'a'):
+        os.utime(path, None)
+
+
+def save_state(state_list):
+    with open('./state.csv', 'w') as state_file:
+        wr = csv.writer(state_file, quoting=csv.QUOTE_ALL)
+        wr.writerow(state_list)
+
+
+def load_state():
+    with open('./state.csv') as state_file:
+        reader = csv.reader(state_file,delimiter=',')
+        state_list = list(reader)
+        if state_list == []:
+            logger.info('The empty state list has been loaded.')
+            return []
+        else:
+            logger.info('The following list has been loaded: [\'{lst}\'] '.format(lst='\', \''.join(state_list[0])))
+            return state_list[0]
+
+
+def initialize():
+    if os.path.exists('./state.csv'):
+        logger.info('State file exists, trying to load state...')
+        prev_state.avail_dates = load_state()
+    else:
+        logger.info('State file doesn\'t exist, creating an empty one.')
+        touch('./state.csv')
+
+
 def callback_query(bot, job):
 
     # Get nearest appointments from INIS site
@@ -76,8 +106,13 @@ def callback_query(bot, job):
 
     # if no dates available - change prev_state to empty list and exit
     if 'empty' in resp_dict.keys():
-        prev_state.avail_dates = []
         logger.info('No dates available')
+        # if state changed - update files and state, otherwise do nothing
+        if prev_state.avail_dates == []:
+            pass
+        else:
+            prev_state.avail_dates = []
+            save_state([])
 
     # if dates are available - get them as python list and compare to previous answer, exit if no changes
     else:
@@ -88,13 +123,14 @@ def callback_query(bot, job):
         else:
             new_list = (list(set(state).difference(prev_state.avail_dates))) # get dates that were not in the previous update
             logger.info('New entries in this response: {new}'.format(new=new_list))
-            bot.send_message(chat_id=chat_id, text='New appointment dates available:\n' + '\n'.join(new_list))
+            #bot.send_message(chat_id=botconf.chat_id, text='New appointment dates available:\n' + '\n'.join(new_list)) # post update to the channel
             prev_state.avail_dates = state
+            save_state(state)
 
 
 def main():
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater(api_token.token)
+    updater = Updater(botconf.token)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -115,8 +151,10 @@ def main():
     # Start the Bot
     updater.start_polling()
 
-    #job_minute = Job(callback_minute)
+    # try to read state file, if no file present - create one with an empty state
+    initialize()
 
+    # Run callback function each 60 seconds
     jq.run_repeating(callback_query, interval=60, first=1)
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
