@@ -42,12 +42,15 @@ prev_state = State()
 
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
-def start(bot, update):
-    update.message.reply_text('Hi. I serve only one purpose at the moment. I post updates to INIS Appointments channel. I can\'t do anything else.')
-
-
 def help(bot, update):
-    update.message.reply_text('This bot serves a single purpose: it posts updates to INIS Appointments channel. That\'s it.')
+    update.message.reply_text('/slots - show INIS appointment slots that are currently available.\n\nBot also posts regular updates to INIS Appointments channel: t.me/inis_appointments.')
+
+
+def slots(bot,update):
+    if prev_state.avail_dates == []:
+        update.message.reply_text('No slots are currently available. Try again later or subscribe to INIS Appointments channel for regular updates.')
+    else:
+        update.message.reply_text('Appointment slots currently available:\n' + '\n'.join(prev_state.avail_dates))
 
 
 def shrug(bot, update):
@@ -81,10 +84,11 @@ def load_state():
     with open('./state.csv') as state_file:
         reader = csv.reader(state_file,delimiter=',')
         state_list = list(reader)
-        if state_list == []:
+        if state_list == [] or state_list[0] == []: # this is weird, but reader reads list in the file as nested [list] - will fix later
             logger.info('The empty state list has been loaded.')
             return []
         else:
+            print(state_list)
             logger.info('The following list has been loaded: [\'{lst}\'] '.format(lst='\', \''.join(state_list[0])))
             return state_list[0]
 
@@ -122,11 +126,12 @@ def callback_query(bot, job):
             pass
         else:
             new_list = (list(set(state).difference(prev_state.avail_dates))) # get dates that were not in the previous update
-            logger.info('New entries in this response: {new}'.format(new=new_list))
-            bot.send_message(chat_id=botconf.chat_id, text='New appointment dates available:\n' + '\n'.join(new_list)) # post update to the channel
+            # post update only if new elements appeared compared to the previous state
+            if len(new_list):
+                logger.info('New entries in this response: {new}'.format(new=new_list))
+                bot.send_message(chat_id=botconf.chat_id, text='New appointment dates available:\n' + '\n'.join(new_list)) # post update to the channel
             prev_state.avail_dates = state
             save_state(state)
-
 
 def main():
     # Create the EventHandler and pass it your bot's token.
@@ -139,8 +144,9 @@ def main():
     jq = updater.job_queue
 
     # on different commands - answer in Telegram
-    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("start", help))
     dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CommandHandler("slots", slots))
 
     # on noncommand i.e message - echo the message on Telegram
     dp.add_handler(MessageHandler(Filters.text, shrug))
