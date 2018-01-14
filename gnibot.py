@@ -40,6 +40,13 @@ class State:
 
 prev_state = State()
 
+params = {
+    'openpage': '',
+    'cat': 'Work',
+    'sbcat': 'All',
+    'typ': 'Renewal',
+}
+
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
 def help(bot, update):
@@ -105,7 +112,7 @@ def initialize():
 def callback_query(bot, job):
 
     # Get nearest appointments from INIS site
-    response = requests.get('https://burghquayregistrationoffice.inis.gov.ie/Website/AMSREG/AMSRegWeb.nsf/(getAppsNear)?openpage&cat=Work&sbcat=All&typ=New', verify=False)
+    response = requests.get('https://burghquayregistrationoffice.inis.gov.ie/Website/AMSREG/AMSRegWeb.nsf/(getAppsNear)', params=params, verify=False)
     resp_dict = response.json()
 
     # if no dates available - change prev_state to empty list and exit
