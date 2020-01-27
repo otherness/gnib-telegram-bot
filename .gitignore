@@ -107,3 +107,6 @@ Pipfile*
 # Project-specific
 botconf.py
 state.csv
+
+.idea
+*.iml

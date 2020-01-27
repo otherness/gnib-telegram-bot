@@ -41,7 +41,7 @@ class State:
 prev_state = State()
 
 params = {
-    'openpage': '',
+    'readform': '',  # seems like fixes 404 response
     'cat': 'Work',
     'sbcat': 'All',
     'typ': 'Renewal',
